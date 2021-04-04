@@ -645,8 +645,7 @@ static int read_from_bdev_async(struct zram *zram, struct bio_vec *bvec,
 #define PAGE_WB_SIG "page_index="
 
 #define PAGE_WRITEBACK 0
-#define HUGE_WRITEBACK 1
-#define IDLE_WRITEBACK 2
+#define IDLE_WRITEBACK 1
 
 static ssize_t writeback_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t len)
@@ -663,8 +662,6 @@ static ssize_t writeback_store(struct device *dev,
 
 	if (sysfs_streq(buf, "idle"))
 		mode = IDLE_WRITEBACK;
-	else if (sysfs_streq(buf, "huge"))
-		mode = HUGE_WRITEBACK;
 	else {
 		if (strncmp(buf, PAGE_WB_SIG, sizeof(PAGE_WB_SIG) - 1))
 			return -EINVAL;
@@ -728,9 +725,6 @@ static ssize_t writeback_store(struct device *dev,
 
 		if (mode == IDLE_WRITEBACK &&
 			  !zram_test_flag(zram, index, ZRAM_IDLE))
-			goto next;
-		if (mode == HUGE_WRITEBACK &&
-			  !zram_test_flag(zram, index, ZRAM_HUGE))
 			goto next;
 		if (zram_test_flag(zram, index, ZRAM_IMPORTANT))
 			goto next;
@@ -940,7 +934,6 @@ static ssize_t read_block_state(struct file *file, char __user *buf,
 			ts.tv_nsec / NSEC_PER_USEC,
 			zram_test_flag(zram, index, ZRAM_SAME) ? 's' : '.',
 			zram_test_flag(zram, index, ZRAM_WB) ? 'w' : '.',
-			zram_test_flag(zram, index, ZRAM_HUGE) ? 'h' : '.',
 			zram_test_flag(zram, index, ZRAM_IDLE) ? 'i' : '.');
 
 		if (count < copied) {
@@ -1112,7 +1105,7 @@ static ssize_t mm_stat_show(struct device *dev,
 	max_used = atomic_long_read(&zram->stats.max_used_pages);
 
 	ret = scnprintf(buf, PAGE_SIZE,
-			"%8llu %8llu %8llu %8lu %8ld %8llu %8lu %8llu %8llu %8llu %8llu\n",
+			"%8llu %8llu %8llu %8lu %8ld %8llu %8lu %8llu %8llu\n",
 			orig_size << PAGE_SHIFT,
 			(u64)atomic64_read(&zram->stats.compr_data_size),
 			mem_used << PAGE_SHIFT,
@@ -1120,8 +1113,6 @@ static ssize_t mm_stat_show(struct device *dev,
 			max_used << PAGE_SHIFT,
 			(u64)atomic64_read(&zram->stats.same_pages),
 			atomic_long_read(&pool_stats.pages_compacted),
-			(u64)atomic64_read(&zram->stats.huge_pages),
-			(u64)atomic64_read(&zram->stats.huge_pages_since),
 			(u64)atomic64_read(&zram->stats.important_pages),
 			(u64)atomic64_read(&zram->stats.important_compr_data_size) / 4096);
 	up_read(&zram->init_lock);
@@ -1221,11 +1212,6 @@ static void zram_free_page(struct zram *zram, size_t index)
 #endif
 	if (zram_test_flag(zram, index, ZRAM_IDLE))
 		zram_clear_flag(zram, index, ZRAM_IDLE);
-
-	if (zram_test_flag(zram, index, ZRAM_HUGE)) {
-		zram_clear_flag(zram, index, ZRAM_HUGE);
-		atomic64_dec(&zram->stats.huge_pages);
-	}
 
 	if (zram_test_flag(zram, index, ZRAM_IMPORTANT)) {
 		zram_clear_flag(zram, index, ZRAM_IMPORTANT);
@@ -1459,12 +1445,6 @@ out:
 	 */
 	zram_slot_lock(zram, index);
 	zram_free_page(zram, index);
-
-	if (comp_len == PAGE_SIZE) {
-		zram_set_flag(zram, index, ZRAM_HUGE);
-		atomic64_inc(&zram->stats.huge_pages);
-		atomic64_inc(&zram->stats.huge_pages_since);
-	}
 
 	if (flags) {
 		zram_set_flag(zram, index, flags);
