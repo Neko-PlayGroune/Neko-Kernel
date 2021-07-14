@@ -9403,7 +9403,7 @@ static bool __update_blocked_fair(struct rq *rq, bool *done)
 		/* Propagate pending load changes to the parent, if any: */
 		se = cfs_rq->tg->se[cpu];
 		if (se && !skip_blocked_update(se))
-			update_load_avg(cfs_rq_of(se), se, UPDATE_TG);
+			update_load_avg(cfs_rq_of(se), se, 0);
 
 		/*
 		 * There can be a lot of idle CPU cgroups.  Don't let fully
