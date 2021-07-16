@@ -2062,6 +2062,10 @@ static ssize_t reclaim_write(struct file *file, const char __user *buf,
 	if (type == RECLAIM_RANGE) {
 		vma = find_vma(mm, start);
 		while (vma) {
+                        /* Moto huangzq2: abort reclaim if app goes to foreground. */
+                        if (task->signal->oom_score_adj == 0)
+                                break;
+
 			if (vma->vm_start > end)
 				break;
 			if (is_vm_hugetlb_page(vma))
@@ -2079,6 +2083,10 @@ static ssize_t reclaim_write(struct file *file, const char __user *buf,
 		for (vma = mm->mmap; vma; vma = vma->vm_next) {
 			if (!can_reclaim(before_reclaim_adj, mm, task))
 				break;
+			
+			/* Moto huangzq2: abort reclaim if app goes to foreground. */
+			if (task->signal->oom_score_adj == 0)
+                                break;
 
 			if (is_vm_hugetlb_page(vma))
 				continue;
