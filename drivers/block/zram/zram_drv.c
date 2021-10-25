@@ -1663,7 +1663,6 @@ static void zram_reset_device(struct zram *zram)
 	set_capacity(zram->disk, 0);
 	part_stat_set_all(&zram->disk->part0, 0);
 
-	up_write(&zram->init_lock);
 	/* I/O operation under all of CPU are done so let's free */
 	zram_meta_free(zram, zram->disksize);
 	zram->disksize = 0;
@@ -1671,6 +1670,7 @@ static void zram_reset_device(struct zram *zram)
 	zcomp_destroy(zram->comp);
 	zram->comp = NULL;
 	reset_bdev(zram);
+	
 	up_write(&zram->init_lock);
 }
 
