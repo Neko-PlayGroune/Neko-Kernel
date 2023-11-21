@@ -72,11 +72,14 @@ void cass_cpu_util(struct cass_cpu_cand *c, int this_cpu)
 static __always_inline
 bool cass_cpu_better(const struct cass_cpu_cand *a,
 		     const struct cass_cpu_cand *b,
-		     int this_cpu, int prev_cpu)
+		     int this_cpu, int prev_cpu, struct task_struct *p)
 {
 #define cass_cmp(a, b) ({ res = (a) - (b); })
 #define cass_eq(a, b) ({ res = (a) == (b); })
 	long res;
+	bool low_util = (a->util <= sched_util_threshold[a->cpu] &&
+            		 b->util <= sched_util_threshold[b->cpu]);
+	bool boosted = uclamp_boosted(p) && (p->prio <= DEFAULT_PRIO - 10);
 
 	/* Prefer the CPU that's not overloaded */
 	if (cass_cmp(b->eff_util / b->cap_max, a->eff_util / a->cap_max))
@@ -87,12 +90,11 @@ bool cass_cpu_better(const struct cass_cpu_cand *a,
 	    cass_cmp(b->eff_util * SCHED_CAPACITY_SCALE / b->cap_max,
 		     a->eff_util * SCHED_CAPACITY_SCALE / a->cap_max))
 		goto done;
-	
+
 	/* Prefer the CPU with lower orig capacity when util is low */
-	if((a->util <= sched_util_threshold[a->cpu] &&
-	    b->util <= sched_util_threshold[b->cpu]) &&
-	    cass_cmp(capacity_orig_of(b->cpu), capacity_orig_of(a->cpu)))
-                goto done;
+	if(low_util && !boosted && cass_cmp(capacity_orig_of(b->cpu),
+					    capacity_orig_of(a->cpu)))
+        goto done;
 
 	/* Prefer the CPU with lower relative utilization */
 	if (cass_cmp(b->util, a->util))
@@ -246,7 +248,7 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool rt)
 		 * cidx still needs to be changed to the other candidate slot.
 		 */
 		if (best == curr ||
-		    cass_cpu_better(curr, best, this_cpu, prev_cpu)) {
+		    cass_cpu_better(curr, best, this_cpu, prev_cpu, p)) {
 			best = curr;
 			cidx ^= 1;
 		}
