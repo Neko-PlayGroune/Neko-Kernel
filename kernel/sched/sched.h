@@ -575,7 +575,6 @@ struct cfs_rq {
 	/* h_nr_queued for SCHED_IDLE tasks */
 	unsigned int		idle_h_nr_running;
 	unsigned int		h_nr_runnable;     /* SCHED_{NORMAL,BATCH,IDLE} */
-	unsigned int		h_nr_delayed;
 
 	s64			avg_vruntime;
 	u64			avg_load;
