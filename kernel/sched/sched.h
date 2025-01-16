@@ -368,7 +368,7 @@ struct dl_bw {
  */
 static inline bool dl_task_fits_capacity(struct task_struct *p, int cpu)
 {
-	unsigned long cap = arch_scale_cpu_capacity(NULL, cpu);
+	unsigned long cap = arch_scale_cpu_capacity(cpu);
 
 	return cap_scale(p->dl.dl_deadline, cap) >= p->dl.dl_runtime;
 }
@@ -1677,8 +1677,6 @@ static inline void unregister_sched_domain_sysctl(void)
 
 extern void flush_smp_call_function_from_idle(void);
 extern int newidle_balance(struct rq *this_rq, struct rq_flags *rf);
-
-#else
 
 #else /* !CONFIG_SMP: */
 static inline void flush_smp_call_function_from_idle(void) { }
