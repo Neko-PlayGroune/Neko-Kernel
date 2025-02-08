@@ -1,0 +1,1 @@
+obj-$(CONFIG_MILLET)		+= millet_core.o millet_pkg.o millet_hs.o
