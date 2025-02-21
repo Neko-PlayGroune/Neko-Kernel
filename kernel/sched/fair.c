@@ -6891,6 +6891,7 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, bool 
 {
 	struct cpumask *cpus = this_cpu_cpumask_var_ptr(select_idle_mask);
 	int i, cpu, idle_cpu = -1, nr = INT_MAX;
+	int this = smp_processor_id();
 	struct sched_domain *this_sd;
 	u64 time;
 
