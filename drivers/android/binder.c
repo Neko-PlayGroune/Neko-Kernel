@@ -2867,6 +2867,21 @@ static int binder_fixup_parent(struct binder_transaction *t,
 	return 0;
 }
 
+#ifdef CONFIG_BINDER_OPT
+ static inline void binder_thread_set_inherit_top_app(
+ 		struct binder_thread *thread, struct binder_thread *from)
+ {
+ 	if (from && is_critical_task(from->task))
+ 		set_inherit_top_app(thread->task, from->task);
+ }
+ 
+ static inline void binder_thread_restore_inherit_top_app(struct binder_thread *thread)
+ {
+ 	if (thread)
+ 		restore_inherit_top_app(thread->task);
+ }
+ #endif
+
 /**
  * binder_proc_transaction() - sends a transaction to a process and wakes it up
  * @t:		transaction to send
@@ -2919,6 +2934,10 @@ static bool binder_proc_transaction(struct binder_transaction *t,
 		thread = binder_select_thread_ilocked(proc);
 
 	if (thread) {
+	#ifdef CONFIG_BINDER_OPT
+		if (!oneway)
+				binder_thread_set_inherit_top_app(thread, t->from);
+	#endif
 		binder_transaction_priority(thread->task, t, node_prio,
 					    node->inherit_rt);
 		binder_enqueue_thread_work_ilocked(thread, &t->work);
@@ -3268,6 +3287,7 @@ static void binder_transaction(struct binder_proc *proc,
 		t->from = thread;
 	else
 		t->from = NULL;
+
 	t->sender_euid = task_euid(proc->tsk);
 	t->to_proc = target_proc;
 	t->to_thread = target_thread;
@@ -3593,6 +3613,9 @@ static void binder_transaction(struct binder_proc *proc,
 		binder_inner_proc_unlock(target_proc);
 
 		wake_up_interruptible_sync(&target_thread->wait);
+	#ifdef CONFIG_BINDER_OPT
+		binder_thread_restore_inherit_top_app(thread);
+	#endif
 		binder_restore_priority(current, in_reply_to->saved_priority);
 		binder_free_transaction(in_reply_to);
 	} else if (!(t->flags & TF_ONE_WAY)) {
