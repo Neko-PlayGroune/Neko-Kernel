@@ -2417,8 +2417,6 @@ long _do_fork(unsigned long clone_flags,
 		get_task_struct(p);
 	}
 
-	wake_up_new_task(p);
-
 #ifdef CONFIG_XIAOMI_MIUI
 	p->top_app = 0;
 	p->inherit_top_app = 0;
@@ -2433,6 +2431,8 @@ long _do_fork(unsigned long clone_flags,
 #ifdef CONFIG_SF_BINDER
 	p->sf_binder_task = 0;
 #endif
+
+	wake_up_new_task(p);
 
 	/* forking complete and child started to run, tell ptracer */
 	if (unlikely(trace))
