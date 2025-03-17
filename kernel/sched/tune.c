@@ -617,7 +617,7 @@ int schedtune_prefer_idle_filter(struct task_struct *p)
 			return 0;
 
 		/* Always prefer idle core for important tasks */
-	     		return 1;
+	     return 1;
 	} else {
 	    /* Skip utilization of idle cores for other cgroups */
 	     return 0;
