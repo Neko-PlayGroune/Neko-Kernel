@@ -5971,7 +5971,6 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	int idle_h_nr_running = task_has_idle_policy(p);
 	int h_nr_delayed = 0;
 	int task_new = !(flags & ENQUEUE_WAKEUP);
-	int idle_h_nr_running = task_has_idle_policy(p);
 	u64 slice = 0;
 
 	/*
@@ -7594,6 +7593,8 @@ static inline void migrate_se_pelt_lag(struct sched_entity *se)
 static void migrate_se_pelt_lag(struct sched_entity *se) {}
 #endif
 
+static void detach_entity_cfs_rq(struct sched_entity *se);
+
 /*
  * Called immediately before a task is migrated to a new CPU; task_cpu(p) and
  * cfs_rq_of(p) references at time of call are still valid and identify the
@@ -7601,6 +7602,8 @@ static void migrate_se_pelt_lag(struct sched_entity *se) {}
  */
 static void migrate_task_rq_fair(struct task_struct *p, int new_cpu)
 {
+	struct sched_entity *se = &p->se;
+
 	if (p->on_rq == TASK_ON_RQ_MIGRATING) {
 		/*
 		 * In case of TASK_ON_RQ_MIGRATING we in fact hold the 'old'
