@@ -618,6 +618,9 @@ static void cptvf_set_irq_affinity(struct cpt_vf *cptvf, int vec)
 	struct pci_dev *pdev = cptvf->pdev;
 	int cpu;
 
+	if (IS_ENABLED(CONFIG_IRQ_SBALANCE))
+ 		return;
+
 	if (!zalloc_cpumask_var(&cptvf->affinity_mask[vec],
 				GFP_KERNEL)) {
 		dev_err(&pdev->dev, "Allocation failed for affinity_mask for VF %d",

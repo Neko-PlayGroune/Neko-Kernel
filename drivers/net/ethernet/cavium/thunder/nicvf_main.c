@@ -1095,6 +1095,9 @@ static void nicvf_set_irq_affinity(struct nicvf *nic)
 {
 	int vec, cpu;
 
+	if (IS_ENABLED(CONFIG_IRQ_SBALANCE))
+ 		return;
+
 	for (vec = 0; vec < nic->num_vec; vec++) {
 		if (!nic->irq_allocated[vec])
 			continue;
