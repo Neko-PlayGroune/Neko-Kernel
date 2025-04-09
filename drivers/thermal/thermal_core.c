@@ -870,7 +870,7 @@ int thermal_zone_bind_cooling_device(struct thermal_zone_device *tz,
 		 "cdev%d_weight", dev->id);
 	sysfs_attr_init(&dev->weight_attr.attr);
 	dev->weight_attr.attr.name = dev->weight_attr_name;
-	dev->weight_attr.attr.mode = 0644;
+	dev->weight_attr.attr.mode = S_IWUSR | S_IRUGO;
 	dev->weight_attr.show = weight_show;
 	dev->weight_attr.store = weight_store;
 	result = device_create_file(&tz->device, &dev->weight_attr);
@@ -1727,7 +1727,8 @@ static ssize_t screen_state_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", sm.screen_state);
 }
 
-static DEVICE_ATTR_RO(screen_state);
+static DEVICE_ATTR(screen_state, 0644,
+	screen_state_show, NULL);
 #endif
 
 static ssize_t usb_online_show(struct device *dev,
@@ -1736,7 +1737,8 @@ static ssize_t usb_online_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", usb_state.usb_online);
 }
 
-static DEVICE_ATTR_RO(usb_online);
+static DEVICE_ATTR(usb_online, 0644,
+	usb_online_show, NULL);
 
 static ssize_t sconfig_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -1756,7 +1758,8 @@ static ssize_t sconfig_store(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR_RW(sconfig);
+static DEVICE_ATTR(sconfig, 0664,
+	sconfig_show, sconfig_store);
 
 static ssize_t charger_temp_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -1775,7 +1778,8 @@ static ssize_t charger_temp_store(struct device *dev,
 
 	return len;
 }
-static DEVICE_ATTR_RW(charger_temp);
+static DEVICE_ATTR(charger_temp, 0664,
+	charger_temp_show, charger_temp_store);
 
 static ssize_t balance_mode_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -1795,7 +1799,8 @@ static ssize_t balance_mode_store(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR_RW(balance_mode);
+static DEVICE_ATTR(balance_mode, 0664,
+	balance_mode_show, balance_mode_store);
 
 static ssize_t boost_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -1812,7 +1817,8 @@ static ssize_t boost_store(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR_RW(boost);
+static DEVICE_ATTR(boost, 0644,
+	boost_show, boost_store);
 
 static ssize_t temp_state_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -1832,7 +1838,8 @@ static ssize_t temp_state_store(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR_RW(temp_state);
+static DEVICE_ATTR(temp_state, 0664,
+	temp_state_show, temp_state_store);
 
 static ssize_t cpu_limits_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -1856,7 +1863,8 @@ static ssize_t cpu_limits_store(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR_RW(cpu_limits);
+static DEVICE_ATTR(cpu_limits, 0664,
+	cpu_limits_show, cpu_limits_store);
 
 static ssize_t board_sensor_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -1867,7 +1875,8 @@ static ssize_t board_sensor_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%s", board_sensor);
 }
 
-static DEVICE_ATTR_RO(board_sensor);
+static DEVICE_ATTR(board_sensor, 0664,
+	board_sensor_show, NULL);
 
 static ssize_t board_sensor_temp_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -1883,7 +1892,8 @@ static ssize_t board_sensor_temp_store(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR_RW(board_sensor_temp);
+static DEVICE_ATTR(board_sensor_temp, 0664,
+	board_sensor_temp_show, board_sensor_temp_store);
 
 static ssize_t board_sensor_second_temp_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -1899,7 +1909,8 @@ static ssize_t board_sensor_second_temp_store(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR_RW(board_sensor_second_temp);
+static DEVICE_ATTR(board_sensor_second_temp, 0664,
+	board_sensor_second_temp_show, board_sensor_second_temp_store);
 
 static ssize_t board_sensor_temp_comp_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -1920,7 +1931,8 @@ static ssize_t board_sensor_temp_comp_store(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR_RW(board_sensor_temp_comp);
+static DEVICE_ATTR(board_sensor_temp_comp, 0664,
+	board_sensor_temp_comp_show, board_sensor_temp_comp_store);
 
 static ssize_t modem_limit_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -1939,7 +1951,8 @@ static ssize_t modem_limit_store(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR_RW(modem_limit);
+static DEVICE_ATTR(modem_limit, 0664,
+	modem_limit_show, modem_limit_store);
 
 static ssize_t market_download_limit_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -1957,7 +1970,8 @@ static ssize_t market_download_limit_store(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR_RW(market_download_limit);
+static DEVICE_ATTR(market_download_limit, 0664,
+	market_download_limit_show, market_download_limit_store);
 
 static ssize_t ambient_sensor_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -1968,7 +1982,8 @@ static ssize_t ambient_sensor_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%s", ambient_sensor);
 }
 
-static DEVICE_ATTR_RO(ambient_sensor);
+static DEVICE_ATTR(ambient_sensor, 0664,
+	ambient_sensor_show, NULL);
 
 static ssize_t ambient_sensor_temp_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -1984,7 +1999,8 @@ static ssize_t ambient_sensor_temp_store(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR_RW(ambient_sensor_temp);
+static DEVICE_ATTR(ambient_sensor_temp, 0664,
+	ambient_sensor_temp_show, ambient_sensor_temp_store);
 
 static int create_thermal_message_node(void)
 {
