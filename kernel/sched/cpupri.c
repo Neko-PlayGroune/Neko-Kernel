@@ -154,7 +154,6 @@ int cpupri_find_fitness(struct cpupri *cp, struct task_struct *p,
 
 	BUG_ON(task_pri >= CPUPRI_NR_PRIORITIES);
 
-retry:
 	for (idx = 0; idx < task_pri; idx++) {
 
 		if (!__cpupri_find(cp, p, lowest_mask, idx))
