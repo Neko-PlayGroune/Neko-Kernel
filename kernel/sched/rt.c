@@ -1557,7 +1557,6 @@ select_task_rq_rt(struct task_struct *p, int cpu, int flags)
 {
 	struct task_struct *curr;
 	struct rq *rq;
-	bool may_not_preempt;
 	struct rq *this_cpu_rq;
 	bool sync = !!(flags & WF_SYNC);
 	bool test;
@@ -1612,11 +1611,9 @@ select_task_rq_rt(struct task_struct *p, int cpu, int flags)
 	 * requirement of the task - which is only important on
 	 * heterogeneous systems like big.LITTLE.
 	 */
-	may_not_preempt = task_may_not_preempt(curr, cpu);
-
-	test = static_branch_unlikely(&sched_energy_present) ||
-	       may_not_preempt || (curr && unlikely(rt_task(curr)) &&
-	       (curr->nr_cpus_allowed < 2 || curr->prio <= p->prio));
+	test = curr &&
+	       unlikely(rt_task(curr)) &&
+	       (curr->nr_cpus_allowed < 2 || curr->prio <= p->prio);
 
 	/*
 	 * Respect the sync flag as long as the task can run on this CPU.
@@ -1642,8 +1639,7 @@ select_task_rq_rt(struct task_struct *p, int cpu, int flags)
 		 * not running a lower priority task.
 		 */
 		if (target != -1 &&
-		   (may_not_preempt ||
-		    p->prio < cpu_rq(target)->rt.highest_prio.curr))
+		    p->prio < cpu_rq(target)->rt.highest_prio.curr)
 			cpu = target;
 	}
 
