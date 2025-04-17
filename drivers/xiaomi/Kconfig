@@ -10,11 +10,6 @@ config XIAOMI_MIUI
 
 if XIAOMI_MIUI
 
-config MILLET
-	bool "MIUI frozen framework"
-	help
-	  MIUI frozen function
-
 config PERF_CRITICAL_RT_TASK
 	bool "Enable set rt binder thread" if EXPERT
 	help
