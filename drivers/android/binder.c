@@ -66,7 +66,6 @@
 #include <linux/syscalls.h>
 #include <linux/task_work.h>
 #include <linux/sizes.h>
-#include <linux/android_vendor.h>
 
 #ifdef CONFIG_MILLET
 #include <linux/millet.h>
@@ -82,7 +81,6 @@
 
 #include "binder_internal.h"
 #include "binder_trace.h"
-#include <trace/hooks/binder.h>
 
 #include "../../kernel/sched/sched.h"
 
@@ -870,7 +868,6 @@ static void binder_transaction_priority(struct binder_thread *thread,
 		.sched_policy = node->sched_policy,
 		.prio = node->min_priority,
 	};
-	bool skip = false;
 
 	if (t->set_priority_called)
 		return;
