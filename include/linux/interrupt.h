@@ -529,7 +529,6 @@ extern void raise_softirq_irqoff(unsigned int nr);
 extern void raise_softirq(unsigned int nr);
 
 DECLARE_PER_CPU(struct task_struct *, ksoftirqd);
-DECLARE_PER_CPU(__u32, active_softirqs);
 
 #ifdef CONFIG_RT_SOFTIRQ_AWARE_SCHED
 DECLARE_PER_CPU(u32, active_softirqs);
