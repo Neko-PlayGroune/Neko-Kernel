@@ -1,0 +1,20 @@
+name: Kernel Build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run build script
+        env:
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN}}
+        run: |
+          chmod +x build.sh
+          ./build.sh
