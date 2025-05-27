@@ -147,12 +147,14 @@ static unsigned long limits_mitigation_notify(struct cpufreq_qcom *c,
 				GENMASK(7, 0);
 		freq = DIV_ROUND_CLOSEST_ULL(freq * c->xo_rate, 1000);
 
-		/* Convert limited freq to reduced capacity */
-		capacity = mult_frac(max_capacity, freq, policy->cpuinfo.max_freq);
+		if (policy) {
+			/* Convert limited freq to reduced capacity */
+			capacity = mult_frac(max_capacity, freq, policy->cpuinfo.max_freq);
 
-		/* Don't pass boost capacity to scheduler */
-		if (capacity > max_capacity)
-			capacity = max_capacity;
+			/* Don't pass boost capacity to scheduler */
+			if (capacity > max_capacity)
+				capacity = max_capacity;
+		}
 	} else {
 		policy = cpufreq_cpu_get_raw(cpu);
 		if (!policy)
@@ -161,7 +163,8 @@ static unsigned long limits_mitigation_notify(struct cpufreq_qcom *c,
 			freq = policy->cpuinfo.max_freq;
 	}
 
-	arch_set_thermal_pressure(policy->related_cpus, max_capacity - capacity);
+	if (policy)
+		arch_set_thermal_pressure(policy->related_cpus, max_capacity - capacity);
 
 	trace_dcvsh_freq(cpumask_first(&c->related_cpus), freq);
 	c->dcvsh_freq_limit = freq;
