@@ -140,6 +140,7 @@ static unsigned long limits_mitigation_notify(struct cpufreq_qcom *c,
 	unsigned long freq, max_capacity, capacity;
 
 	max_capacity = arch_scale_cpu_capacity(cpu);
+	policy = cpufreq_cpu_get_raw(cpu);
 	capacity = max_capacity;
 
 	if (limit) {
@@ -156,7 +157,6 @@ static unsigned long limits_mitigation_notify(struct cpufreq_qcom *c,
 				capacity = max_capacity;
 		}
 	} else {
-		policy = cpufreq_cpu_get_raw(cpu);
 		if (!policy)
 			freq = U32_MAX;
 		else
