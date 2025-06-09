@@ -5037,7 +5037,6 @@ void scheduler_tick(void)
 	struct rq *rq = cpu_rq(cpu);
 	struct task_struct *curr = rq->curr;
 	struct rq_flags rf;
-	u64 wallclock;
 	unsigned int flag = 0;
 	unsigned long thermal_pressure;
 
@@ -5045,7 +5044,6 @@ void scheduler_tick(void)
 
 	rq_lock(rq, &rf);
 
-	wallclock = sched_ktime_clock();
 	update_rq_clock(rq);
 	thermal_pressure = arch_scale_thermal_pressure(cpu_of(rq));
 	update_thermal_load_avg(rq_clock_thermal(rq), rq, thermal_pressure);
@@ -5919,7 +5917,6 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 	struct rq_flags rf;
 	struct rq *rq;
 	int cpu;
-	u64 wallclock;
 
 	cpu = smp_processor_id();
 	rq = cpu_rq(cpu);
@@ -5995,7 +5992,6 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 	clear_tsk_need_resched(prev);
 	clear_preempt_need_resched();
 
-	wallclock = sched_ktime_clock();
 	if (likely(prev != next)) {
 		rq->nr_switches++;
 		/*
