@@ -1911,12 +1911,9 @@ static int do_execveat_common(int fd, struct filename *filename,
 			      struct user_arg_ptr envp,
 			      int flags)
 {
-	#ifdef CONFIG_KSU
-	if (unlikely(ksu_execveat_hook))
-		ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
-	else
-		ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
-    #endif
+#ifdef CONFIG_KSU
+	ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
+#endif
 	return __do_execve_file(fd, filename, argv, envp, flags, NULL);
 }
 
