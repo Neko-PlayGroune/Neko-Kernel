@@ -61,11 +61,7 @@ export PATH
 export ARCH=arm64
 
 # Каталог для сборки MagicTime
-if [ "$DEVICE" = "alioth" ] || [ "$DEVICE" = "munch" ]; then
-    MAGIC_TIME_DIR="$KERNEL_DIR/MagicTime"
-else
-    MAGIC_TIME_DIR="$KERNEL_DIR/MagicTime2"
-fi
+MAGIC_TIME_DIR="$KERNEL_DIR/MagicTime-$DEVICE"
 
 # Создание каталога MagicTime, если его нет
 if [ ! -d "$MAGIC_TIME_DIR" ]; then
@@ -89,9 +85,15 @@ else
 fi
 
 # Экспорт переменных среды
+if [ "$DEVICE" = "pipa" ]; then
+export IMGPATH="$MAGIC_TIME_DIR/kernels/Image"
+export DTBPATH="$MAGIC_TIME_DIR/kernels/dtb"
+export DTBOPATH="$MAGIC_TIME_DIR/kernels/dtbo.img"
+else
 export IMGPATH="$MAGIC_TIME_DIR/Image"
 export DTBPATH="$MAGIC_TIME_DIR/dtb"
 export DTBOPATH="$MAGIC_TIME_DIR/dtbo.img"
+fi
 export CROSS_COMPILE="aarch64-linux-gnu-"
 export CROSS_COMPILE_COMPAT="arm-linux-gnueabi-"
 export KBUILD_BUILD_USER="TIMISONG"
