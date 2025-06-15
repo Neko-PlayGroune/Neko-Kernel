@@ -1,36 +1,52 @@
 menu "KernelSU"
 
 config KSU
-	tristate "KernelSU function support"
-	depends on OVERLAY_FS
-	default y
-	help
-	  Enable kernel-level root privileges on Android System.
-	  To compile as a module, choose M here: the
-	  module will be called kernelsu.
-
-config KSU_WITH_KPROBES
-	bool "Use kprobes for kernelsu"
-	depends on KSU
-	depends on KPROBES
-	default y
-	help
-	  Disable if you use manual hooks.
+	  tristate "KernelSU function support"
+	  default y
+	  help
+	    Enable kernel-level root privileges on Android System.
+	    To compile as a module, choose M here: the
+	    module will be called kernelsu.
 
 config KSU_DEBUG
-	bool "KernelSU debug mode"
-	depends on KSU
+	  bool "KernelSU debug mode"
+	  depends on KSU
+	  default n
+	  help
+	    Enable KernelSU debug mode.
+
+config KSU_MANUAL_HOOK
+	bool "Manual hooking GKI kernels without kprobes"
+	depends on KSU && KSU != m
 	default n
 	help
-	  Enable KernelSU debug mode.
+	  If enabled, Hook required KernelSU syscalls with manually-patched function.
+	  If disabled, Hook required KernelSU syscalls with Kernel-probe.
 
 config KSU_ALLOWLIST_WORKAROUND
-        bool "KernelSU Session Keyring Init workaround"
-        depends on KSU
-        default n
-        help
-          Enable session keyring init workaround for problematic devices.
-          Useful for situations where the SU allowlist is not kept after a reboot.
+    bool "KernelSU Session Keyring Init workaround"
+    depends on KSU
+    default n
+    help
+      Enable session keyring init workaround for problematic devices.
+      Useful for situations where the SU allowlist is not kept after a reboot
+
+config KSU_CMDLINE
+	  bool "Enable KernelSU cmdline"
+	  depends on KSU && KSU != m
+	  default n
+	  help
+	    Enable a cmdline called kernelsu.enabled
+	    Value 1 means enabled, value 0 means disabled.
+
+config KPM
+	  bool "Enable SukiSU KPM"
+	  depends on KSU && 64BIT
+	  default y
+	  help
+	    Enabling this option will activate the KPM feature of SukiSU.
+	    This option is suitable for scenarios where you need to force KPM to be enabled.
+	    but it may affect system stability.
 
 menu "KernelSU - SUSFS"
 config KSU_SUSFS
@@ -41,7 +57,7 @@ config KSU_SUSFS
       Patch and Enable SUSFS to kernel with KernelSU.
 
 config KSU_SUSFS_HAS_MAGIC_MOUNT
-    bool "Say yes if the current KernelSU repo has magic mount implemented (default n)"
+    bool "Say yes if the current KernelSU repo has magic mount implemented (default y)"
     depends on KSU
     default y
     help
