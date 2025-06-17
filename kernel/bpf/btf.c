@@ -1973,7 +1973,7 @@ int btf_find_spin_lock(const struct btf *btf, const struct btf_type *t)
 			continue;
 		if (member_type->size != sizeof(struct bpf_spin_lock))
 			continue;
-		if (strcmp(__btf_name_by_offset(btf, member_type->name_off),
+		if (strcmp(btf_name_by_offset(btf, member_type->name_off),
 			   "bpf_spin_lock"))
 			continue;
 		if (off != -ENOENT)
