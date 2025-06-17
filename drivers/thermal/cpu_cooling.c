@@ -174,6 +174,14 @@ void cpu_limits_set_level(unsigned int cpu, unsigned int max_freq)
 		if (cdev_cpu == cpu) {
 			for (level = 0; level <= cpufreq_cdev->max_level; level++) {
 				int target_freq = cpufreq_cdev->em->table[level].frequency;
+			#ifdef CONFIG_MACH_XIAOMI_PIPA
+				if (max_freq >= target_freq) {
+					cdev = cpufreq_cdev->cdev;
+					if (cdev)
+						cdev->ops->set_cur_state(cdev, level);
+					break;
+				}
+			#else
 				if (max_freq <= target_freq) {
 					if (level < 6)
 						level = 6;
@@ -182,6 +190,7 @@ void cpu_limits_set_level(unsigned int cpu, unsigned int max_freq)
 						cdev->ops->set_cur_state(cdev, cpufreq_cdev->max_level - level);
 					break;
 				}
+			#endif
 			}
 			break;
 		}
