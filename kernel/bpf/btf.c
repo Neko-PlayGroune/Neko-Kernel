@@ -666,13 +666,13 @@ static void btf_verifier_log_member(struct btf_verifier_env *env,
 	if (btf_type_kflag(struct_type))
 		__btf_verifier_log(log,
 				   "\t%s type_id=%u bitfield_size=%u bits_offset=%u",
-				   __btf_name_by_offset(btf, member->name_off),
+				   btf_name_by_offset(btf, member->name_off),
 				   member->type,
 				   BTF_MEMBER_BITFIELD_SIZE(member->offset),
 				   BTF_MEMBER_BIT_OFFSET(member->offset));
 	else
 		__btf_verifier_log(log, "\t%s type_id=%u bits_offset=%u",
-				   __btf_name_by_offset(btf, member->name_off),
+				   btf_name_by_offset(btf, member->name_off),
 				   member->type, member->offset);
 
 	if (fmt && *fmt) {
