@@ -3,6 +3,19 @@
 # Добавляем данные из настроек
 source ../settings.sh
 
+#
+# Создайте файл ../settings.sh если его у вас нет
+# Его содержание:
+#
+# export VERSION="1.x.x"
+# export BUILD=1
+# export PREFIX="e"
+# export DESC="description"
+# export DEVICE="alioth"
+# export TGTOKEN=bot_id
+# export LAST=last commit hash for generation changelog
+#
+
 # Начало отсчета времени выполнения скрипта
 start_time=$(date +%s)
 
@@ -168,7 +181,7 @@ else
 
     curl -s -X POST "https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel" \
     -F document=@"./MagicTime-$DEVICE-$MAGIC_BUILD_DATE.zip" \
-    -F caption="MagicTime ${VERSION}${PREFIX}${BUILD} (${BUILD_TYPE}) branch: ${BRANCH}" \
+    -F caption="MagicTime ${VERSION}${PREFIX}${BUILD} (${DESC}) branch: ${BRANCH}" \
     -F message_thread_id="38153"
     
     curl -s -X POST "https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel" \
