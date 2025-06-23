@@ -403,8 +403,8 @@ void cgroup_base_stat_cputime_show(struct seq_file *seq)
 {
 	struct cgroup *cgrp = seq_css(seq)->cgroup;
 	u64 usage, utime, stime;
-	struct cgroup_base_stat bstat;
 #ifdef CONFIG_SCHED_CORE
+	struct cgroup_base_stat bstat;
 	u64 forceidle_time;
 #endif
 
