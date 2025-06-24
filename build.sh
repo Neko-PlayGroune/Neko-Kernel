@@ -33,7 +33,7 @@ git log $LAST..HEAD > ../changelog.txt
 BRANCH=$(git branch --show-current)
 
 # Каталоги компиляторов
-CLANG_DIR=$KERNEL_DIR/clang21
+CLANG_DIR=$KERNEL_DIR/clang20
 GCC_ARM_DIR=$KERNEL_DIR/arm-linux-androideabi-4.9
 GCC_AARCH64_DIR=$KERNEL_DIR/aarch64-linux-android-4.9
 
@@ -67,7 +67,7 @@ check_and_wget() {
 
 # Клонирование инструментов компиляции, если они не существуют
 check_and_wget $CLANG_DIR \
-    https://github.com/ZyCromerZ/Clang/releases/download/21.0.0git-20250322-release/Clang-21.0.0git-20250322.tar.gz
+    https://github.com/ZyCromerZ/Clang/releases/download/20.0.0git-20250129-release/Clang-20.0.0git-20250129.tar.gz
 check_and_clone $GCC_ARM_DIR \
     https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 \
         arm-linux-androideabi-4.9
