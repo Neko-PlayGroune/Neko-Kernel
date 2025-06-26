@@ -1,117 +1,142 @@
 #!/bin/bash
 
-# Добавляем данные из настроек
-source ../settings.sh
+# Exit on error, enable debug tracing for GitHub Actions
+set -e
+set -o pipefail
 
-#
-# Создайте файл ../settings.sh если его у вас нет
-# Его содержание:
-#
-# export VERSION="1.x.x"
-# export BUILD=1
-# export PREFIX="e"
-# export DESC="description"
-# export DEVICE="alioth"
-# export TGTOKEN=bot_id
-# export LAST=last commit hash for generation changelog
-# export TYPE="test or early"
-# export LEVEL=1
-# export EXTRA=""
-#
-
-# Начало отсчета времени выполнения скрипта
+# Record start time
 start_time=$(date +%s)
 
-# Удаление каталога "out", если он существует
-rm -rf out
-
-# Основной каталог
-MAINPATH=/home/timisong # измените, если необходимо
-
-# Каталог ядра
-KERNEL_DIR=$MAINPATH/kernel
-KERNEL_PATH=$KERNEL_DIR/kernel_xiaomi_sm8250
-
-# Каталоги компиляторов
-CLANG_DIR=$KERNEL_DIR/clang20
-GCC_ARM_DIR=$KERNEL_DIR/arm-linux-androideabi-4.9
-GCC_AARCH64_DIR=$KERNEL_DIR/aarch64-linux-android-4.9
-
-# Проверка и клонирование, если необходимо
-check_and_clone() {
-    local dir=$1
-    local repo=$2
-    local name=$3
-
-    if [ ! -d $dir ]; then
-        echo Папка $dir не существует. Клонирование $repo
-        cd $dir
-        git clone $repo $name
-    fi
+# Error handling function
+handle_error() {
+    local line=$1
+    local error_code=$2
+    local message="Error at line $line (exit code $error_code)"
+    echo "ERROR: $message"
+    send_telegram "Build failed: $message"
+    send_telegram_file "./build.log" || echo "Warning: Failed to upload build log"
+    exit 1
 }
 
-check_and_wget() {
-    local dir=$1
-    local repo=$2
-
-    if [ ! -d $dir ]; then
-        echo Папка $dir не существует. Клонирование $repo
-        mkdir $dir
-        cd $dir
-        wget -O clang.tar.gz $repo
-        tar -zxvf clang.tar.gz
-        rm -rf clang.tar.gz
-        cd ../kernel_xiaomi_sm8250
-    fi
+# Telegram notification function
+send_telegram() {
+    local message=$1
+    for attempt in {1..3}; do
+        if curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d text="$message" --max-time 10; then
+            return 0
+        fi
+        echo "Warning: Telegram notification attempt $attempt failed, retrying..."
+        sleep 2
+    done
+    echo "Warning: Telegram notification failed after $attempt attempts"
 }
 
-build() {
-    git log $LAST..HEAD > ../changelog.txt
-    BRANCH=$(git branch --show-current)
-
-    # Каталог для сборки MagicTime
-    MAGICTIME_DIR=$KERNEL_DIR/MagicTime-$DEVICE
-
-    # Создание каталога MagicTime, если его нет
-    if [ ! -d $MAGICTIME_DIR ]; then
-        mkdir -p $MAGICTIME_DIR
-        
-        # Проверка и клонирование Anykernel, если MagicTime не существует
-        if [ ! -d $MAGICTIME_DIR/Anykernel ]; then
-            git clone https://github.com/TIMISONG-dev/Anykernel.git \
-                $MAGICTIME_DIR/Anykernel
-            
-            # Перемещение всех файлов из Anykernel в MagicTime
-            mv $MAGICTIME_DIR/Anykernel/* $MAGICTIME_DIR/
-            
-            # Удаление папки Anykernel
-            rm -rf $MAGICTIME_DIR/Anykernel
+# Telegram file upload function
+send_telegram_file() {
+    local file=$1
+    [ -f "$file" ] || { echo "Warning: File $file not found for Telegram upload"; return 1; }
+    for attempt in {1..3}; do
+        if curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendDocument?chat_id=${TELEGRAM_CHAT_ID}" \
+            -F document=@"$file" --max-time 30; then
+            return 0
         fi
-    else
-        # Если папка MagicTime существует, проверить наличие .git и удалить, если есть
-        if [ -d $MAGICTIME_DIR/.git ]; then
-            rm -rf $MAGICTIME_DIR/.git
+        echo "Warning: Telegram file upload attempt $attempt failed, retrying..."
+        sleep 2
+    done
+    echo "Warning: Telegram file upload failed after $attempt attempts"
+}
+
+# Combined success message and file upload
+send_success() {
+    local message=$1
+    local file=$2
+    [ -f "$file" ] || { echo "Error: Zip file $file not found"; handle_error ${LINENO} "Missing zip file"; }
+    for attempt in {1..3}; do
+        if curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendDocument?chat_id=${TELEGRAM_CHAT_ID}" \
+            -F document=@"$file" -F caption="$message" --max-time 30; then
+            return 0
         fi
-    fi
+        echo "Warning: Telegram success upload attempt $attempt failed, retrying..."
+        sleep 2
+    done
+    echo "Warning: Telegram success notification failed after $attempt attempts"
+}
 
-    # Экспорт переменных среды
-    if [ $DEVICE = pipa ]; then
-        IMGPATH=$MAGICTIME_DIR/kernels/Image
-        DTBPATH=$MAGICTIME_DIR/kernels/dtb
-        DTBOPATH=$MAGICTIME_DIR/kernels/dtbo.img
-    else
-        IMGPATH=$MAGICTIME_DIR/Image
-        DTBPATH=$MAGICTIME_DIR/dtb
-        DTBOPATH=$MAGICTIME_DIR/dtbo.img
-    fi
+# Trap errors
+trap 'handle_error ${LINENO} $?' ERR
 
-    make O="$OUT_DIR" \
-            ${DEVICE}_defconfig \
-            vendor/xiaomi/magictime-common.config
+# Directory setup
+MAINPATH="${GITHUB_WORKSPACE:-$(pwd)}"
+KERNEL_PATH="${MAINPATH}"
+CLANG_DIR="${KERNEL_PATH}/clang"
+WAIFU_DIR="${KERNEL_PATH}/Waifu"
+OUTPUT_DIR="${KERNEL_PATH}/out"
+DTS_DIR="${OUTPUT_DIR}/arch/arm64/boot/dts"
+DTBO_DIR="${OUTPUT_DIR}/arch/arm64/boot"
 
-    # Компиляция ядра
-    make -j $(nproc) \
-                O="$OUT_DIR" \
+# Ensure directories exist
+mkdir -p "$CLANG_DIR" "$WAIFU_DIR" "$OUTPUT_DIR" || handle_error ${LINENO} "Failed to create directories"
+
+# Download Clang if missing
+if [ ! -d "$CLANG_DIR/bin" ]; then
+    echo "Downloading Clang to $CLANG_DIR"
+    cd "$CLANG_DIR" || handle_error ${LINENO} "Failed to change to $CLANG_DIR"
+    CLANG_URL=$(curl -s https://raw.githubusercontent.com/ZyCromerZ/Clang/refs/heads/main/Clang-main-link.txt) || handle_error ${LINENO} "Failed to fetch Clang URL"
+    wget -q "https://github.com/ZyCromerZ/Clang/releases/download/20.0.0git-20250129-release/Clang-20.0.0git-20250129.tar.gz" -O clang.tar.gz || handle_error ${LINENO} "Failed to download Clang"
+    tar -zxvf clang.tar.gz && rm -f clang.tar.gz || handle_error ${LINENO} "Failed to extract/remove Clang archive"
+    cd "$KERNEL_PATH" || handle_error ${LINENO} "Failed to return to kernel directory"
+fi
+
+# Set up environment
+export PATH="${CLANG_DIR}/bin:${PATH}"
+export ARCH=arm64
+export CROSS_COMPILE="aarch64-linux-gnu-"
+export CROSS_COMPILE_COMPAT="arm-linux-gnueabi-"
+export KBUILD_BUILD_USER="y82t2z"
+export KBUILD_BUILD_HOST="GitHubActions"
+export DEVICE="alioth"
+export IMGPATH="${WAIFU_DIR}/Image"
+export DTBPATH="${WAIFU_DIR}/dtb"
+export DTBOPATH="${WAIFU_DIR}/dtbo.img"
+
+# AnyKernel setup
+if [ ! -f "${WAIFU_DIR}/anykernel.sh" ]; then
+    echo "Cloning AnyKernel to $WAIFU_DIR"
+    git clone -q --depth 1 "https://github.com/y82t2z/Anykernel.git" "${WAIFU_DIR}" || handle_error ${LINENO} "Failed to clone AnyKernel"
+    rm -rf "${WAIFU_DIR}/.git" || echo "Warning: Failed to remove .git directory"
+fi
+
+# Build configuration
+BUILD_DATE=$(date '+%Y-%m-%d_%H-%M-%S')
+cd "$KERNEL_PATH" || handle_error ${LINENO} "Failed to change to kernel directory"
+
+# System info
+CPU_INFO=$(grep "model name" /proc/cpuinfo | head -n 1 || echo "CPU info not available")
+CPU_COUNT=$(nproc || echo "Unknown")
+RAM_INFO=$(free -h | awk '/Mem:/ {print $2}' || echo "RAM info not available")
+GIT_COMMIT=$(git log -1 --pretty="%h - %s" 2>/dev/null || echo "No git info")
+TRIGGER="Build triggered on $(date '+%Y-%m-%d %H:%M:%S') by ${GITHUB_ACTOR:-unknown}"
+
+# Send build info
+send_telegram "Build Info:
+CPU: $CPU_INFO
+Thread: $CPU_COUNT
+RAM: $RAM_INFO
+Commit: $GIT_COMMIT
+Device: $DEVICE"
+
+# Clean previous build
+rm -rf "$OUTPUT_DIR" build.log
+mkdir -p "$OUTPUT_DIR"
+
+# Build kernel
+echo "Generating kernel config..."
+make CC=clang O="$OUTPUT_DIR" "alioth_defconfig" "vendor/xiaomi/neko-common.config" || handle_error ${LINENO} "Failed to generate config"
+
+echo "Building kernel..."
+make -j$(nproc --all) O="$OUTPUT_DIR" \
                 CC="ccache clang" \
                 HOSTCC=gcc \
                 LD=ld.lld \
@@ -123,249 +148,48 @@ build() {
                 STRIP=llvm-strip \
                 LLVM=1 \
                 LLVM_IAS=1 \
-                V=$VERBOSE 2>&1 | tee build.log
+    2>&1 | tee build.log || handle_error ${LINENO} "Kernel compilation failed"
 
+# Verify output directories
+[ -d "$DTS_DIR" ] || handle_error ${LINENO} "DTS directory $DTS_DIR not found"
+[ -d "$DTBO_DIR" ] || handle_error ${LINENO} "DTBO directory $DTBO_DIR not found"
 
-# Предполагается, что переменная DTS установлена ранее в скрипте
-find $DTS -name '*.dtb' -exec cat {} + > $DTBPATH
-find $DTS -name 'Image' -exec cat {} + > $IMGPATH
-find $DTS -name 'dtbo.img' -exec cat {} + > $DTBOPATH
+# Collect output files
+echo "Collecting DTB, Image, and dtbo.img..."
+find "$DTS_DIR" -name '*.dtb' -exec cat {} + > "$DTBPATH" || handle_error ${LINENO} "Failed to collect DTB files"
+find "$DTBO_DIR" -name 'Image' -exec cp {} "$IMGPATH" \; || handle_error ${LINENO} "Failed to copy Image"
+find "$DTBO_DIR" -name 'dtbo.img' -exec cp {} "$DTBOPATH" \; || handle_error ${LINENO} "Failed to copy dtbo.img"
 
-# Завершение отсчета времени выполнения скрипта
+# Calculate build time
 end_time=$(date +%s)
 elapsed_time=$((end_time - start_time))
 
-cd "$KERNEL_PATH"
-
-# Проверка успешности сборки
-if grep -q -E "Ошибка 2|Error 2" build.log; then
-    cd $KERNEL_PATH
-    echo Ошибка: Сборка завершилась с ошибкой
-
-    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendMessage \
-    -d chat_id=@magictimekernel \
-    -d text="Ошибка в компиляции!" \
-    -d message_thread_id=38153
-
-    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
-    -F document=@./build.log \
-    -F message_thread_id=38153
-
-    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
-    -F document=@../changelog.txt \
-    -F message_thread_id=38153
-else
-    echo Общее время выполнения: $elapsed_time секунд
-    # Перемещение в каталог MagicTime и создание архива
-    cd $MAGICTIME_DIR
-    7z a -mx9 MagicTime-$DEVICE-$MAGIC_BUILD_DATE.zip * -x!*.zip
-    
-    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendMessage \
-    -d chat_id=@magictimekernel \
-    -d text="Компиляция завершилась успешно! Время выполнения: $elapsed_time секунд" \
-    -d message_thread_id=38153
-
-    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
-    -F document=@./MagicTime-$DEVICE-$MAGIC_BUILD_DATE.zip \
-    -F caption="MagicTime ${VERSION}${PREFIX}${BUILD} (${DESC}) branch: ${BRANCH}" \
-    -F message_thread_id=38153
-    
-    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
-    -F document=@../changelog.txt \
-    -F caption="Latest changes" \
-    -F message_thread_id=38153
-
-    rm -rf MagicTime-$DEVICE-$MAGIC_BUILD_DATE.zip
-
-    BUILD=$((BUILD + 1))
-
-    cd $KERNEL_PATH
-    LAST=$(git log -1 --format=%H)
-
-    sed -i "s/LAST=.*/LAST=$LAST/" ../settings.sh
-    sed -i "s/BUILD=.*/BUILD=$BUILD/" ../settings.sh
-fi
-}
-
-# Клонирование инструментов компиляции, если они не существуют
-check_and_wget $CLANG_DIR \
-    https://github.com/ZyCromerZ/Clang/releases/download/20.0.0git-20250129-release/Clang-20.0.0git-20250129.tar.gz
-check_and_clone $GCC_ARM_DIR \
-    https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 \
-        arm-linux-androideabi-4.9
-check_and_clone $GCC_AARCH64_DIR \
-    https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 \
-        aarch64-linux-android-4.9
-
-# Установка переменных PATH
-export PATH=$CLANG_DIR/bin:$GCC_AARCH64_DIR/bin:$GCC_ARM_DIR/bin:$PATH
-export ARCH=arm64
-export CROSS_COMPILE=aarch64-linux-gnu-
-export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
-export KBUILD_BUILD_USER=TIMISONG
-export KBUILD_BUILD_HOST=timisong-dev
-
-# Запись времени сборки
-MAGIC_BUILD_DATE=$(date '+%Y-%m-%d_%H-%M-%S')
-
-# Каталог для результатов сборки
-OUT_DIR=out
-
-# Конфигурация ядра
-if [ $LEVEL = 1 ] && [ $TYPE = test ]; then
-    DEVICE="alioth"
-    DESC="POCO F3 build"
-    build
-    LEVEL=$((LEVEL + 1))
-    sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
-    clear
+# Check for compilation errors
+if grep -q -E "Error 2" build.log; then
+    echo "Error: Build failed"
+    send_telegram "Compilation error!"
+    send_telegram_file "./build.log"
+    exit 1
 fi
 
-if [ $LEVEL = 1 ] && [ $TYPE = early ]; then
-    build
-    clear
-fi
+# Create zip
+echo "Creating zip file..."
+cd "$WAIFU_DIR" || handle_error ${LINENO} "Failed to change to Waifu directory"
+zip_file="Neko-${DEVICE}-${GIT_COMMIT}-${BUILD_DATE}.zip"
 
-if [ $TYPE = test ]; then
-    if [ $LEVEL = 2 ]; then
-        DEVICE="pipa"
-        DESC="Mi Pad 6 AOSP build"
-        build
-        LEVEL=$((LEVEL + 1))
-        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
-        clear
-    fi
+# Verify critical files
+for file in "$IMGPATH" "$DTBPATH" "$DTBOPATH"; do
+    [ -f "$file" ] || handle_error ${LINENO} "Missing file: $file"
+done
 
-    if [ $LEVEL = 3 ]; then
-        DEVICE="alioth"
-        git cherry-pick 6180281005f4a2ce7ea4895d1e35be47f99b3e11
-        DESC="POCO F3 build 5k battery"
-        build
-        LEVEL=$((LEVEL + 1))
-        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
-        clear
-        git reset --hard HEAD~1
-    fi
+# List files for debugging
+echo "Files in $WAIFU_DIR before zipping:"
+ls -l "$WAIFU_DIR" || echo "No files found in $WAIFU_DIR"
 
-    if [ $LEVEL = 4 ]; then
-        git revert 48d6466f502f0ed1ecafbad71aac79ec64f60cd8 --no-edit
-        git cherry-pick 2897f115faac5228433002d380ab0176ba825c95
-        git revert a3f0009c637419795baf4195c4b236aa4c23a00a --no-edit
-        DESC="POCO F3 build without susfs"
-        build
-        LEVEL=$((LEVEL + 1))
-        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
-        clear
-    fi
+# Create zip with necessary files
+zip -r9 "$zip_file" . -x "*.git*" || handle_error ${LINENO} "Failed to create zip archive"
 
-    if [ $LEVEL = 5 ]; then
-        if [ $EXTRA = "!4"]; then
-            git revert 48d6466f502f0ed1ecafbad71aac79ec64f60cd8 --no-edit
-            git cherry-pick 2897f115faac5228433002d380ab0176ba825c95
-            git revert a3f0009c637419795baf4195c4b236aa4c23a00a --no-edit
-        fi
-        DEVICE="pipa"
-        DESC="Mi Pad 6 AOSP build without susfs"
-        build
-        LEVEL=$((LEVEL + 1))
-        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
-        clear
-    fi
+# Send success notification
+send_success "Success! Time: $elapsed_time seconds \nBuild completed for $DEVICE on $BUILD_DATE" "$zip_file"
 
-    if [ $LEVEL = 6 ]; then
-        if [ $EXTRA = "!4"]; then
-            git revert 48d6466f502f0ed1ecafbad71aac79ec64f60cd8 --no-edit
-            git cherry-pick 2897f115faac5228433002d380ab0176ba825c95
-            git revert a3f0009c637419795baf4195c4b236aa4c23a00a --no-edit
-        fi
-        DEVICE="alioth"
-        git cherry-pick 6180281005f4a2ce7ea4895d1e35be47f99b3e11
-        DESC="POCO F3 build 5k battery without susfs"
-        build
-        LEVEL=$((LEVEL + 1))
-        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
-        clear
-
-        git reset --hard HEAD~4
-        clear
-    fi
-
-    # MIUI
-
-    git checkout magictime-miui
-
-    if [ $LEVEL = 7 ]; then
-        DESC="POCO F3 MIUI build"
-        build
-        LEVEL=$((LEVEL + 1))
-        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
-        clear
-    fi
-
-    if [ $LEVEL = 8 ]; then
-        DEVICE="pipa"
-        DESC="Mi Pad 6 MIUI build"
-        build
-        LEVEL=$((LEVEL + 1))
-        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
-        clear
-    fi
-
-    if [ $LEVEL = 9 ]; then
-        DEVICE="alioth"
-        git cherry-pick 6180281005f4a2ce7ea4895d1e35be47f99b3e11
-        DESC="POCO F3 MIUI build 5k battery"
-        build
-        LEVEL=$((LEVEL + 1))
-        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
-        clear
-        git reset --hard HEAD~1
-    fi
-
-    if [ $LEVEL = 10 ]; then
-        git revert 48d6466f502f0ed1ecafbad71aac79ec64f60cd8 --no-edit
-        git cherry-pick 2897f115faac5228433002d380ab0176ba825c95
-        git revert a3f0009c637419795baf4195c4b236aa4c23a00a --no-edit
-        DESC="POCO F3 MIUI build without susfs"
-        build
-        LEVEL=$((LEVEL + 1))
-        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
-        clear
-    fi
-
-    if [ $LEVEL = 11 ]; then
-        if [ $EXTRA = "!10" ]; then
-            git revert 48d6466f502f0ed1ecafbad71aac79ec64f60cd8 --no-edit
-            git cherry-pick 2897f115faac5228433002d380ab0176ba825c95
-            git revert a3f0009c637419795baf4195c4b236aa4c23a00a --no-edit
-        fi
-        DEVICE="pipa"
-        DESC="Mi Pad 6 MIUI build without susfs"
-        build
-        LEVEL=$((LEVEL + 1))
-        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
-        clear
-    fi
-
-    if [ $LEVEL = 12 ]; then
-        if [ $EXTRA = "!10" ]; then
-            git revert 48d6466f502f0ed1ecafbad71aac79ec64f60cd8 --no-edit
-            git cherry-pick 2897f115faac5228433002d380ab0176ba825c95
-            git revert a3f0009c637419795baf4195c4b236aa4c23a00a --no-edit
-        fi
-        DEVICE="alioth"
-        git cherry-pick 6180281005f4a2ce7ea4895d1e35be47f99b3e11
-        DESC="POCO F3 MIUI build 5k battery without susfs"
-        build
-
-        git reset --hard HEAD~4
-        clear
-    fi
-
-    LEVEL=1
-    EXTRA=""
-    sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
-    sed -i "s/EXTRA=.*/EXTRA=$EXTRA/" ../settings.sh
-    git checkout magictime-new
-    clear
-fi
+echo "Build completed successfully in $elapsed_time seconds"
