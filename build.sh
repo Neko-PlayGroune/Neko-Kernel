@@ -106,7 +106,7 @@ output_dir=out
 # Конфигурация ядра
 make O="$output_dir" \
             ${DEVICE}_defconfig \
-            vendor/xiaomi/sm8250-common.config
+            vendor/xiaomi/magictime-common.config
 
     # Компиляция ядра
     make -j $(nproc) \
