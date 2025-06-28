@@ -7636,7 +7636,6 @@ long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 	cpumask_var_t cpus_allowed, new_mask;
 	struct task_struct *p;
 	int retval;
-	int dest_cpu;
 
 	rcu_read_lock();
 
