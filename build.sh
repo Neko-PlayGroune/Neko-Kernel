@@ -133,7 +133,7 @@ mkdir -p "$OUTPUT_DIR"
 
 # Build kernel
 echo "Generating kernel config..."
-make CC=clang O="$OUTPUT_DIR" "alioth_defconfig" "vendor/xiaomi/sm8250-common.config" || handle_error ${LINENO} "Failed to generate config"
+make CC=clang O="$OUTPUT_DIR" "alioth_defconfig" "vendor/xiaomi/neko-common.config" || handle_error ${LINENO} "Failed to generate config"
 
 echo "Building kernel..."
 make -j$(nproc --all) O="$OUTPUT_DIR" \
