@@ -34,17 +34,19 @@ BRANCH=$(git branch --show-current)
 
 # Каталоги компиляторов
 CLANG_DIR=$KERNEL_DIR/clang21
-ANDROID_PREBUILTS_GCC_ARM_DIR=$KERNEL_DIR/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9
-ANDROID_PREBUILTS_GCC_AARCH64_DIR=$KERNEL_DIR/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9
+GCC_ARM_DIR=$KERNEL_DIR/arm-linux-androideabi-4.9
+GCC_AARCH64_DIR=$KERNEL_DIR/aarch64-linux-android-4.9
 
 # Проверка и клонирование, если необходимо
 check_and_clone() {
     local dir=$1
     local repo=$2
+    local name=$3
 
-    if [ ! -d "$dir" ]; then
-        echo "Папка $dir не существует. Клонирование $repo."
-        git clone $repo $dir
+    if [ ! -d $dir ]; then
+        echo Папка $dir не существует. Клонирование $repo
+        cd $dir
+        git clone $repo $name
     fi
 }
 
@@ -52,80 +54,85 @@ check_and_wget() {
     local dir=$1
     local repo=$2
 
-    if [ ! -d "$dir" ]; then
-        echo "Папка $dir не существует. Клонирование $repo."
+    if [ ! -d $dir ]; then
+        echo Папка $dir не существует. Клонирование $repo
         mkdir $dir
         cd $dir
-        wget $repo
-        tar -zxvf Clang-21.0.0git-20250322.tar.gz
-        rm -rf Clang-21.0.0git-20250322.tar.gz
+        wget -O clang.tar.gz $repo
+        tar -zxvf clang.tar.gz
+        rm -rf clang.tar.gz
         cd ../kernel_xiaomi_sm8250
     fi
 }
 
 # Клонирование инструментов компиляции, если они не существуют
-check_and_wget $CLANG_DIR https://github.com/ZyCromerZ/Clang/releases/download/21.0.0git-20250322-release/Clang-21.0.0git-20250322.tar.gz
-check_and_clone $ANDROID_PREBUILTS_GCC_ARM_DIR https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9
-check_and_clone $ANDROID_PREBUILTS_GCC_AARCH64_DIR https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9
-
-# Установка переменных PATH
-PATH=$CLANG_DIR/bin:$ANDROID_PREBUILTS_GCC_AARCH64_DIR/bin:$ANDROID_PREBUILTS_GCC_ARM_DIR/bin:$PATH
-export PATH
-export ARCH=arm64
+check_and_wget $CLANG_DIR \
+    https://github.com/ZyCromerZ/Clang/releases/download/21.0.0git-20250322-release/Clang-21.0.0git-20250322.tar.gz
+check_and_clone $GCC_ARM_DIR \
+    https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 \
+        arm-linux-androideabi-4.9
+check_and_clone $GCC_AARCH64_DIR \
+    https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 \
+        aarch64-linux-android-4.9
 
 # Каталог для сборки MagicTime
-MAGIC_TIME_DIR="$KERNEL_DIR/MagicTime-$DEVICE"
+MAGICTIME_DIR=$KERNEL_DIR/MagicTime-$DEVICE
 
 # Создание каталога MagicTime, если его нет
-if [ ! -d "$MAGIC_TIME_DIR" ]; then
-    mkdir -p "$MAGIC_TIME_DIR"
+if [ ! -d $MAGICTIME_DIR ]; then
+    mkdir -p $MAGICTIME_DIR
     
     # Проверка и клонирование Anykernel, если MagicTime не существует
-    if [ ! -d "$MAGIC_TIME_DIR/Anykernel" ]; then
-        git clone https://github.com/TIMISONG-dev/Anykernel.git "$MAGIC_TIME_DIR/Anykernel"
+    if [ ! -d $MAGICTIME_DIR/Anykernel ]; then
+        git clone https://github.com/TIMISONG-dev/Anykernel.git \
+            $MAGICTIME_DIR/Anykernel
         
         # Перемещение всех файлов из Anykernel в MagicTime
-        mv "$MAGIC_TIME_DIR/Anykernel/"* "$MAGIC_TIME_DIR/"
+        mv $MAGICTIME_DIR/Anykernel/* $MAGICTIME_DIR/
         
         # Удаление папки Anykernel
-        rm -rf "$MAGIC_TIME_DIR/Anykernel"
+        rm -rf $MAGICTIME_DIR/Anykernel
     fi
 else
     # Если папка MagicTime существует, проверить наличие .git и удалить, если есть
-    if [ -d "$MAGIC_TIME_DIR/.git" ]; then
-        rm -rf "$MAGIC_TIME_DIR/.git"
+    if [ -d $MAGICTIME_DIR/.git ]; then
+        rm -rf $MAGICTIME_DIR/.git
     fi
 fi
 
 # Экспорт переменных среды
-if [ "$DEVICE" = "pipa" ]; then
-export IMGPATH="$MAGIC_TIME_DIR/kernels/Image"
-export DTBPATH="$MAGIC_TIME_DIR/kernels/dtb"
-export DTBOPATH="$MAGIC_TIME_DIR/kernels/dtbo.img"
+if [ $DEVICE = pipa ]; then
+    IMGPATH=$MAGICTIME_DIR/kernels/Image
+    DTBPATH=$MAGICTIME_DIR/kernels/dtb
+    DTBOPATH=$MAGICTIME_DIR/kernels/dtbo.img
 else
-export IMGPATH="$MAGIC_TIME_DIR/Image"
-export DTBPATH="$MAGIC_TIME_DIR/dtb"
-export DTBOPATH="$MAGIC_TIME_DIR/dtbo.img"
+    IMGPATH=$MAGICTIME_DIR/Image
+    DTBPATH=$MAGICTIME_DIR/dtb
+    DTBOPATH=$MAGICTIME_DIR/dtbo.img
 fi
-export CROSS_COMPILE="aarch64-linux-gnu-"
-export CROSS_COMPILE_COMPAT="arm-linux-gnueabi-"
-export KBUILD_BUILD_USER="TIMISONG"
-export KBUILD_BUILD_HOST="timisong-dev"
+
+# Установка переменных PATH
+export PATH=$CLANG_DIR/bin:$GCC_AARCH64_DIR/bin:$GCC_ARM_DIR/bin:$PATH
+export ARCH=arm64
+export CROSS_COMPILE=aarch64-linux-gnu-
+export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+export KBUILD_BUILD_USER=TIMISONG
+export KBUILD_BUILD_HOST=timisong-dev
 
 # Запись времени сборки
 MAGIC_BUILD_DATE=$(date '+%Y-%m-%d_%H-%M-%S')
 
 # Каталог для результатов сборки
-output_dir=out
+OUT_DIR=out
 
 # Конфигурация ядра
-make O="$output_dir" \
+make O="$OUT_DIR" \
             ${DEVICE}_defconfig \
             vendor/xiaomi/magictime-common.config
 
     # Компиляция ядра
     make -j $(nproc) \
-                O="$output_dir" \
+                O="$OUT_DIR" \
                 CC="ccache clang" \
                 HOSTCC=gcc \
                 LD=ld.lld \
@@ -153,47 +160,47 @@ cd "$KERNEL_PATH"
 
 # Проверка успешности сборки
 if grep -q -E "Ошибка 2|Error 2" build.log; then
-    cd "$KERNEL_PATH"
-    echo "Ошибка: Сборка завершилась с ошибкой"
+    cd $KERNEL_PATH
+    echo Ошибка: Сборка завершилась с ошибкой
 
     curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendMessage \
-    -d chat_id="@magictimekernel" \
+    -d chat_id=@magictimekernel \
     -d text="Ошибка в компиляции!" \
-    -d message_thread_id="38153"
+    -d message_thread_id=38153
 
-    curl -s -X POST "https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel" \
-    -F document=@"./build.log" \
-    -F message_thread_id="38153"
+    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
+    -F document=@./build.log \
+    -F message_thread_id=38153
 
-    curl -s -X POST "https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel" \
-    -F document=@"../changelog.txt" \
-    -F message_thread_id="38153"
+    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
+    -F document=@../changelog.txt \
+    -F message_thread_id=38153
 else
-    echo "Общее время выполнения: $elapsed_time секунд"
+    echo Общее время выполнения: $elapsed_time секунд
     # Перемещение в каталог MagicTime и создание архива
-    cd "$MAGIC_TIME_DIR"
+    cd $MAGICTIME_DIR
     7z a -mx9 MagicTime-$DEVICE-$MAGIC_BUILD_DATE.zip * -x!*.zip
     
     curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendMessage \
-    -d chat_id="@magictimekernel" \
+    -d chat_id=@magictimekernel \
     -d text="Компиляция завершилась успешно! Время выполнения: $elapsed_time секунд" \
-    -d message_thread_id="38153"
+    -d message_thread_id=38153
 
-    curl -s -X POST "https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel" \
-    -F document=@"./MagicTime-$DEVICE-$MAGIC_BUILD_DATE.zip" \
+    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
+    -F document=@./MagicTime-$DEVICE-$MAGIC_BUILD_DATE.zip \
     -F caption="MagicTime ${VERSION}${PREFIX}${BUILD} (${DESC}) branch: ${BRANCH}" \
-    -F message_thread_id="38153"
+    -F message_thread_id=38153
     
-    curl -s -X POST "https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel" \
-    -F document=@"../changelog.txt" \
+    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
+    -F document=@../changelog.txt \
     -F caption="Latest changes" \
-    -F message_thread_id="38153"
+    -F message_thread_id=38153
 
     rm -rf MagicTime-$DEVICE-$MAGIC_BUILD_DATE.zip
 
     BUILD=$((BUILD + 1))
 
-    cd "$KERNEL_PATH"
+    cd $KERNEL_PATH
     LAST=$(git log -1 --format=%H)
 
     sed -i "s/LAST=.*/LAST=$LAST/" ../settings.sh
