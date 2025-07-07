@@ -1381,15 +1381,15 @@ compress_again:
 				__GFP_HIGHMEM |
 				__GFP_MOVABLE |
 				__GFP_CMA);
-	if (IS_ERR((void *)handle)) {
+	if (!handle) {
 		zcomp_stream_put(zram->comp);
 		atomic64_inc(&zram->stats.writestall);
 		handle = zs_malloc(zram->mem_pool, comp_len,
 				GFP_NOIO | __GFP_HIGHMEM |
 				__GFP_MOVABLE | __GFP_CMA);
-		if (!IS_ERR((void *)handle))
+		if (handle)
 			goto compress_again;
-		return PTR_ERR((void *)handle);
+		return -ENOMEM;
 	}
 
 	alloced_pages = zs_get_total_pages(zram->mem_pool);
