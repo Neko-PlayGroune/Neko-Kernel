@@ -7860,23 +7860,8 @@ out:
 	return err;
 }
 
-/**
- * ufshcd_issue_tm_cmd - issues task management commands to controller
- * @hba: per adapter instance
- * @lun_id: LUN ID to which TM command is sent
- * @task_id: task ID to which the TM command is applicable
- * @tm_function: task management function opcode
- * @tm_response: task management service response return value
- *
- * Returns non-zero value on error, zero on success.
- */
-#if defined(CONFIG_UFSFEATURE_31)
-int ufshcd_issue_tm_cmd(struct ufs_hba *hba, int lun_id, int task_id,
-                u8 tm_function, u8 *tm_response)
-#else
 static int __ufshcd_issue_tm_cmd(struct ufs_hba *hba,
 		struct utp_task_req_desc *treq, u8 tm_function)
-#endif
 {
 	struct Scsi_Host *host = hba->host;
 	unsigned long flags;
@@ -7959,8 +7944,13 @@ static int __ufshcd_issue_tm_cmd(struct ufs_hba *hba,
  *
  * Returns non-zero value on error, zero on success.
  */
+#if defined(CONFIG_UFSFEATURE_31)
+int ufshcd_issue_tm_cmd(struct ufs_hba *hba, int lun_id, int task_id,
+                u8 tm_function, u8 *tm_response)
+#else
 static int ufshcd_issue_tm_cmd(struct ufs_hba *hba, int lun_id, int task_id,
 		u8 tm_function, u8 *tm_response)
+#endif
 {
 	struct utp_task_req_desc treq = { { 0 }, };
 	int ocs_value, err;
