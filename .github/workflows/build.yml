@@ -13,7 +13,7 @@ jobs:
         
       - name: Install
         run: |
-          sudo apt install cache flex zip 
+          sudo apt install ccache flex zip 
 
       - name: Run build script
         env:
