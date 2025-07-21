@@ -10,6 +10,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        
+      - name: Install
+        run: |
+          sudo apt install cache flex zip 
 
       - name: Run build script
         env:
