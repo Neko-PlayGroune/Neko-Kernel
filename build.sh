@@ -14,6 +14,9 @@ source ../settings.sh
 # export DEVICE="alioth"
 # export TGTOKEN=bot_id
 # export LAST=last commit hash for generation changelog
+# export TYPE="test or early"
+# export LEVEL=1
+# export EXTRA=""
 #
 
 # Начало отсчета времени выполнения скрипта
@@ -28,9 +31,6 @@ MAINPATH=/home/timisong # измените, если необходимо
 # Каталог ядра
 KERNEL_DIR=$MAINPATH/kernel
 KERNEL_PATH=$KERNEL_DIR/kernel_xiaomi_sm8250
-
-git log $LAST..HEAD > ../changelog.txt
-BRANCH=$(git branch --show-current)
 
 # Каталоги компиляторов
 CLANG_DIR=$KERNEL_DIR/clang20
@@ -63,6 +63,92 @@ check_and_wget() {
         rm -rf clang.tar.gz
         cd ../kernel_xiaomi_sm8250
     fi
+}
+
+build() {
+    git log $LAST..HEAD > ../changelog.txt
+    BRANCH=$(git branch --show-current)
+
+    make O="$OUT_DIR" \
+            ${DEVICE}_defconfig \
+            vendor/xiaomi/magictime-common.config
+
+    # Компиляция ядра
+    make -j $(nproc) \
+                O="$OUT_DIR" \
+                CC="ccache clang" \
+                HOSTCC=gcc \
+                LD=ld.lld \
+                AS=llvm-as \
+                AR=llvm-ar \
+                NM=llvm-nm \
+                OBJCOPY=llvm-objcopy \
+                OBJDUMP=llvm-objdump \
+                STRIP=llvm-strip \
+                LLVM=1 \
+                LLVM_IAS=1 \
+                V=$VERBOSE 2>&1 | tee build.log
+
+
+# Предполагается, что переменная DTS установлена ранее в скрипте
+find $DTS -name '*.dtb' -exec cat {} + > $DTBPATH
+find $DTS -name 'Image' -exec cat {} + > $IMGPATH
+find $DTS -name 'dtbo.img' -exec cat {} + > $DTBOPATH
+
+# Завершение отсчета времени выполнения скрипта
+end_time=$(date +%s)
+elapsed_time=$((end_time - start_time))
+
+cd "$KERNEL_PATH"
+
+# Проверка успешности сборки
+if grep -q -E "Ошибка 2|Error 2" build.log; then
+    cd $KERNEL_PATH
+    echo Ошибка: Сборка завершилась с ошибкой
+
+    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendMessage \
+    -d chat_id=@magictimekernel \
+    -d text="Ошибка в компиляции!" \
+    -d message_thread_id=38153
+
+    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
+    -F document=@./build.log \
+    -F message_thread_id=38153
+
+    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
+    -F document=@../changelog.txt \
+    -F message_thread_id=38153
+else
+    echo Общее время выполнения: $elapsed_time секунд
+    # Перемещение в каталог MagicTime и создание архива
+    cd $MAGICTIME_DIR
+    7z a -mx9 MagicTime-$DEVICE-$MAGIC_BUILD_DATE.zip * -x!*.zip
+    
+    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendMessage \
+    -d chat_id=@magictimekernel \
+    -d text="Компиляция завершилась успешно! Время выполнения: $elapsed_time секунд" \
+    -d message_thread_id=38153
+
+    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
+    -F document=@./MagicTime-$DEVICE-$MAGIC_BUILD_DATE.zip \
+    -F caption="MagicTime ${VERSION}${PREFIX}${BUILD} (${DESC}) branch: ${BRANCH}" \
+    -F message_thread_id=38153
+    
+    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
+    -F document=@../changelog.txt \
+    -F caption="Latest changes" \
+    -F message_thread_id=38153
+
+    rm -rf MagicTime-$DEVICE-$MAGIC_BUILD_DATE.zip
+
+    BUILD=$((BUILD + 1))
+
+    cd $KERNEL_PATH
+    LAST=$(git log -1 --format=%H)
+
+    sed -i "s/LAST=.*/LAST=$LAST/" ../settings.sh
+    sed -i "s/BUILD=.*/BUILD=$BUILD/" ../settings.sh
+fi
 }
 
 # Клонирование инструментов компиляции, если они не существуют
@@ -126,83 +212,145 @@ MAGIC_BUILD_DATE=$(date '+%Y-%m-%d_%H-%M-%S')
 OUT_DIR=out
 
 # Конфигурация ядра
-make O="$OUT_DIR" \
-            ${DEVICE}_defconfig \
-            vendor/xiaomi/magictime-common.config
+if [ $LEVEL = 1 ] && [ $TYPE = test ]; then
+    DEVICE="alioth"
+    DESC="POCO F3 build"
+    build
+    LEVEL=$((LEVEL + 1))
+    sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
+    clear
+fi
 
-    # Компиляция ядра
-    make -j $(nproc) \
-                O="$OUT_DIR" \
-                CC="ccache clang" \
-                HOSTCC=gcc \
-                LD=ld.lld \
-                AS=llvm-as \
-                AR=llvm-ar \
-                NM=llvm-nm \
-                OBJCOPY=llvm-objcopy \
-                OBJDUMP=llvm-objdump \
-                STRIP=llvm-strip \
-                LLVM=1 \
-                LLVM_IAS=1 \
-                V=$VERBOSE 2>&1 | tee build.log
-                
+if [ $LEVEL = 1 ] && [ $TYPE = early ]; then
+    build
+    clear
+fi
 
-# Предполагается, что переменная DTS установлена ранее в скрипте
-find $DTS -name '*.dtb' -exec cat {} + > $DTBPATH
-find $DTS -name 'Image' -exec cat {} + > $IMGPATH
-find $DTS -name 'dtbo.img' -exec cat {} + > $DTBOPATH
+if [ $TYPE = test ]; then
+    if [ $LEVEL = 2 ]; then
+        DEVICE="pipa"
+        DESC="Mi Pad 6 AOSP build"
+        build
+        LEVEL=$((LEVEL + 1))
+        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
+        clear
+    fi
 
-# Завершение отсчета времени выполнения скрипта
-end_time=$(date +%s)
-elapsed_time=$((end_time - start_time))
+    if [ $LEVEL = 3 ]; then
+        DEVICE="alioth"
+        git cherry-pick 6180281005f4a2ce7ea4895d1e35be47f99b3e11
+        DESC="POCO F3 build 5k battery"
+        build
+        LEVEL=$((LEVEL + 1))
+        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
+        clear
+        git reset --hard HEAD~1
+    fi
 
-cd "$KERNEL_PATH"
+    if [ $LEVEL = 4 ]; then
+        git revert 48d6466f502f0ed1ecafbad71aac79ec64f60cd8 --no-edit
+        git cherry-pick 2897f115faac5228433002d380ab0176ba825c95
+        git revert a3f0009c637419795baf4195c4b236aa4c23a00a --no-edit
+        DESC="POCO F3 build without susfs"
+        build
+        LEVEL=$((LEVEL + 1))
+        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
+        clear
+    fi
 
-# Проверка успешности сборки
-if grep -q -E "Ошибка 2|Error 2" build.log; then
-    cd $KERNEL_PATH
-    echo Ошибка: Сборка завершилась с ошибкой
+    if [ $LEVEL = 5 ]; then
+        if [ $EXTRA = "!4"]; then
+            git revert 48d6466f502f0ed1ecafbad71aac79ec64f60cd8 --no-edit
+            git cherry-pick 2897f115faac5228433002d380ab0176ba825c95
+            git revert a3f0009c637419795baf4195c4b236aa4c23a00a --no-edit
+        fi
+        DEVICE="pipa"
+        DESC="Mi Pad 6 AOSP build without susfs"
+        build
+        LEVEL=$((LEVEL + 1))
+        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
+        clear
+    fi
 
-    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendMessage \
-    -d chat_id=@magictimekernel \
-    -d text="Ошибка в компиляции!" \
-    -d message_thread_id=38153
+    if [ $LEVEL = 6 ]; then
+        if [ $EXTRA = "!4"]; then
+            git revert 48d6466f502f0ed1ecafbad71aac79ec64f60cd8 --no-edit
+            git cherry-pick 2897f115faac5228433002d380ab0176ba825c95
+            git revert a3f0009c637419795baf4195c4b236aa4c23a00a --no-edit
+        fi
+        DEVICE="alioth"
+        git cherry-pick 6180281005f4a2ce7ea4895d1e35be47f99b3e11
+        DESC="POCO F3 build 5k battery without susfs"
+        build
+        LEVEL=$((LEVEL + 1))
+        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
+        clear
 
-    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
-    -F document=@./build.log \
-    -F message_thread_id=38153
+        git reset --hard HEAD~4
+        clear
+    fi
 
-    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
-    -F document=@../changelog.txt \
-    -F message_thread_id=38153
-else
-    echo Общее время выполнения: $elapsed_time секунд
-    # Перемещение в каталог MagicTime и создание архива
-    cd $MAGICTIME_DIR
-    7z a -mx9 MagicTime-$DEVICE-$MAGIC_BUILD_DATE.zip * -x!*.zip
-    
-    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendMessage \
-    -d chat_id=@magictimekernel \
-    -d text="Компиляция завершилась успешно! Время выполнения: $elapsed_time секунд" \
-    -d message_thread_id=38153
+    # MIUI
 
-    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
-    -F document=@./MagicTime-$DEVICE-$MAGIC_BUILD_DATE.zip \
-    -F caption="MagicTime ${VERSION}${PREFIX}${BUILD} (${DESC}) branch: ${BRANCH}" \
-    -F message_thread_id=38153
-    
-    curl -s -X POST https://api.telegram.org/bot$TGTOKEN/sendDocument?chat_id=@magictimekernel \
-    -F document=@../changelog.txt \
-    -F caption="Latest changes" \
-    -F message_thread_id=38153
+    git checkout magictime-miui
 
-    rm -rf MagicTime-$DEVICE-$MAGIC_BUILD_DATE.zip
+    if [ $LEVEL = 7 ]; then
+        DESC="POCO F3 MIUI build"
+        build
+        LEVEL=$((LEVEL + 1))
+        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
+        clear
+    fi
 
-    BUILD=$((BUILD + 1))
+    if [ $LEVEL = 8 ]; then
+        DEVICE="pipa"
+        DESC="Mi Pad 6 MIUI build"
+        build
+        LEVEL=$((LEVEL + 1))
+        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
+        clear
+    fi
 
-    cd $KERNEL_PATH
-    LAST=$(git log -1 --format=%H)
+    if [ $LEVEL = 9 ]; then
+        DEVICE="alioth"
+        git cherry-pick 6180281005f4a2ce7ea4895d1e35be47f99b3e11
+        DESC="POCO F3 MIUI build 5k battery"
+        build
+        LEVEL=$((LEVEL + 1))
+        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
+        clear
+        git reset --hard HEAD~1
+    fi
 
-    sed -i "s/LAST=.*/LAST=$LAST/" ../settings.sh
-    sed -i "s/BUILD=.*/BUILD=$BUILD/" ../settings.sh
+    if [ $LEVEL = 10 ]; then
+        git revert 48d6466f502f0ed1ecafbad71aac79ec64f60cd8 --no-edit
+        git cherry-pick 2897f115faac5228433002d380ab0176ba825c95
+        git revert a3f0009c637419795baf4195c4b236aa4c23a00a --no-edit
+        DESC="POCO F3 MIUI build without susfs"
+        build
+        LEVEL=$((LEVEL + 1))
+        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
+        clear
+    fi
+
+    if [ $LEVEL = 11 ]; then
+        if [ $EXTRA = "!10"]; then
+            git revert 48d6466f502f0ed1ecafbad71aac79ec64f60cd8 --no-edit
+            git cherry-pick 2897f115faac5228433002d380ab0176ba825c95
+            git revert a3f0009c637419795baf4195c4b236aa4c23a00a --no-edit
+        fi
+        git cherry-pick 6180281005f4a2ce7ea4895d1e35be47f99b3e11
+        DESC="POCO F3 MIUI build 5k battery without susfs"
+        build
+
+        git reset --hard HEAD~4
+        clear
+    fi
+
+    LEVEL=1
+    EXTRA=""
+    sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
+    sed -i "s/EXTRA=.*/EXTRA=$EXTRA/" ../settings.sh
+    git checkout magictime-new
+    clear
 fi
