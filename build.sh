@@ -69,6 +69,42 @@ build() {
     git log $LAST..HEAD > ../changelog.txt
     BRANCH=$(git branch --show-current)
 
+    # Каталог для сборки MagicTime
+    MAGICTIME_DIR=$KERNEL_DIR/MagicTime-$DEVICE
+
+    # Создание каталога MagicTime, если его нет
+    if [ ! -d $MAGICTIME_DIR ]; then
+        mkdir -p $MAGICTIME_DIR
+        
+        # Проверка и клонирование Anykernel, если MagicTime не существует
+        if [ ! -d $MAGICTIME_DIR/Anykernel ]; then
+            git clone https://github.com/TIMISONG-dev/Anykernel.git \
+                $MAGICTIME_DIR/Anykernel
+            
+            # Перемещение всех файлов из Anykernel в MagicTime
+            mv $MAGICTIME_DIR/Anykernel/* $MAGICTIME_DIR/
+            
+            # Удаление папки Anykernel
+            rm -rf $MAGICTIME_DIR/Anykernel
+        fi
+    else
+        # Если папка MagicTime существует, проверить наличие .git и удалить, если есть
+        if [ -d $MAGICTIME_DIR/.git ]; then
+            rm -rf $MAGICTIME_DIR/.git
+        fi
+    fi
+
+    # Экспорт переменных среды
+    if [ $DEVICE = pipa ]; then
+        IMGPATH=$MAGICTIME_DIR/kernels/Image
+        DTBPATH=$MAGICTIME_DIR/kernels/dtb
+        DTBOPATH=$MAGICTIME_DIR/kernels/dtbo.img
+    else
+        IMGPATH=$MAGICTIME_DIR/Image
+        DTBPATH=$MAGICTIME_DIR/dtb
+        DTBOPATH=$MAGICTIME_DIR/dtbo.img
+    fi
+
     make O="$OUT_DIR" \
             ${DEVICE}_defconfig \
             vendor/xiaomi/magictime-common.config
@@ -160,42 +196,6 @@ check_and_clone $GCC_ARM_DIR \
 check_and_clone $GCC_AARCH64_DIR \
     https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 \
         aarch64-linux-android-4.9
-
-# Каталог для сборки MagicTime
-MAGICTIME_DIR=$KERNEL_DIR/MagicTime-$DEVICE
-
-# Создание каталога MagicTime, если его нет
-if [ ! -d $MAGICTIME_DIR ]; then
-    mkdir -p $MAGICTIME_DIR
-    
-    # Проверка и клонирование Anykernel, если MagicTime не существует
-    if [ ! -d $MAGICTIME_DIR/Anykernel ]; then
-        git clone https://github.com/TIMISONG-dev/Anykernel.git \
-            $MAGICTIME_DIR/Anykernel
-        
-        # Перемещение всех файлов из Anykernel в MagicTime
-        mv $MAGICTIME_DIR/Anykernel/* $MAGICTIME_DIR/
-        
-        # Удаление папки Anykernel
-        rm -rf $MAGICTIME_DIR/Anykernel
-    fi
-else
-    # Если папка MagicTime существует, проверить наличие .git и удалить, если есть
-    if [ -d $MAGICTIME_DIR/.git ]; then
-        rm -rf $MAGICTIME_DIR/.git
-    fi
-fi
-
-# Экспорт переменных среды
-if [ $DEVICE = pipa ]; then
-    IMGPATH=$MAGICTIME_DIR/kernels/Image
-    DTBPATH=$MAGICTIME_DIR/kernels/dtb
-    DTBOPATH=$MAGICTIME_DIR/kernels/dtbo.img
-else
-    IMGPATH=$MAGICTIME_DIR/Image
-    DTBPATH=$MAGICTIME_DIR/dtb
-    DTBOPATH=$MAGICTIME_DIR/dtbo.img
-fi
 
 # Установка переменных PATH
 export PATH=$CLANG_DIR/bin:$GCC_AARCH64_DIR/bin:$GCC_ARM_DIR/bin:$PATH
