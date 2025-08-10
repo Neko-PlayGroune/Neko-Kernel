@@ -334,11 +334,26 @@ if [ $TYPE = test ]; then
     fi
 
     if [ $LEVEL = 11 ]; then
-        if [ $EXTRA = "!10"]; then
+        if [ $EXTRA = "!10" ]; then
             git revert 48d6466f502f0ed1ecafbad71aac79ec64f60cd8 --no-edit
             git cherry-pick 2897f115faac5228433002d380ab0176ba825c95
             git revert a3f0009c637419795baf4195c4b236aa4c23a00a --no-edit
         fi
+        DEVICE="pipa"
+        DESC="Mi Pad 6 MIUI build without susfs"
+        build
+        LEVEL=$((LEVEL + 1))
+        sed -i "s/LEVEL=.*/LEVEL=$LEVEL/" ../settings.sh
+        clear
+    fi
+
+    if [ $LEVEL = 12 ]; then
+        if [ $EXTRA = "!10" ]; then
+            git revert 48d6466f502f0ed1ecafbad71aac79ec64f60cd8 --no-edit
+            git cherry-pick 2897f115faac5228433002d380ab0176ba825c95
+            git revert a3f0009c637419795baf4195c4b236aa4c23a00a --no-edit
+        fi
+        DEVICE="alioth"
         git cherry-pick 6180281005f4a2ce7ea4895d1e35be47f99b3e11
         DESC="POCO F3 MIUI build 5k battery without susfs"
         build
